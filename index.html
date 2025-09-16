@@ -7,6 +7,25 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@tailwindcss/forms@0.5.6/dist/forms.min.css" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease-in-out',
+                        'pulse-soft': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         
@@ -30,6 +49,15 @@
         .card-hover:hover {
             transform: translateY(-5px);
             box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        .animate-pulse-soft {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        
+        /* Dark mode styles */
+        .dark .dark\:bg-gradient-to-br {
+            background-image: linear-gradient(to bottom right, var(--tw-gradient-stops));
         }
     </style>
 </head>
@@ -102,6 +130,14 @@
         </div>
         
         <div id="message" class="hidden mt-4 p-3 rounded-md text-sm"></div>
+        
+        <!-- Info tentang status API -->
+        <div id="api-status" class="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900 rounded-md text-sm text-yellow-700 dark:text-yellow-300 hidden">
+            <div class="flex items-center">
+                <i data-lucide="alert-triangle" class="w-4 h-4 mr-2"></i>
+                <span>Server API sedang dalam tahap development. Beberapa fitur mungkin belum berfungsi.</span>
+            </div>
+        </div>
     </div>
 
     <!-- Loading Overlay -->
@@ -139,7 +175,7 @@
         function showMessage(message, type = 'error') {
             const messageEl = document.getElementById('message');
             messageEl.textContent = message;
-            messageEl.className = `mt-4 p-3 rounded-md text-sm ${type === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`;
+            messageEl.className = `mt-4 p-3 rounded-md text-sm ${type === 'error' ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200' : 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200'}`;
             messageEl.classList.remove('hidden');
             
             // Sembunyikan pesan setelah 5 detik
@@ -159,18 +195,48 @@
             
             // Jika response adalah JSON, parse sebagai JSON
             if (contentType && contentType.includes('application/json')) {
-                const data = await response.json();
-                return { ok: response.ok, data, status: response.status };
+                try {
+                    const data = await response.json();
+                    return { ok: response.ok, data, status: response.status };
+                } catch (e) {
+                    console.error('Error parsing JSON:', e);
+                    return { 
+                        ok: false, 
+                        data: { message: 'Terjadi kesalahan parsing data.' },
+                        status: response.status
+                    };
+                }
             } 
             // Jika response adalah HTML/teks, tangani sebagai error
             else {
-                const text = await response.text();
-                console.error('Non-JSON response:', text.substring(0, 100) + '...');
-                return { 
-                    ok: false, 
-                    data: { message: 'Terjadi kesalahan server. Silakan coba lagi.' },
-                    status: response.status
-                };
+                try {
+                    const text = await response.text();
+                    console.error('Non-JSON response:', text.substring(0, 100) + '...');
+                    
+                    // Coba untuk ekstrak pesan error dari HTML jika mungkin
+                    let errorMsg = 'Terjadi kesalahan server. Silakan coba lagi.';
+                    
+                    if (response.status === 404) {
+                        errorMsg = 'Endpoint API tidak ditemukan. Pastikan server berjalan dengan benar.';
+                    } else if (response.status === 500) {
+                        errorMsg = 'Terjadi kesalahan internal server.';
+                    } else if (text.includes('The page could not be found')) {
+                        errorMsg = 'Fitur ini sedang dalam pengembangan.';
+                    }
+                    
+                    return { 
+                        ok: false, 
+                        data: { message: errorMsg },
+                        status: response.status
+                    };
+                } catch (textError) {
+                    console.error('Error reading response text:', textError);
+                    return { 
+                        ok: false, 
+                        data: { message: 'Terjadi kesalahan tidak terduga.' },
+                        status: response.status
+                    };
+                }
             }
         }
         
@@ -199,14 +265,17 @@
                 const { ok, data } = await handleFetchResponse(response);
                 
                 if (ok) {
-                    // Redirect ke dashboard
-                    window.location.href = '/dashboard.html';
+                    showMessage('Login berhasil! Mengarahkan ke dashboard...', 'success');
+                    // Redirect ke dashboard setelah delay singkat
+                    setTimeout(() => {
+                        window.location.href = '/dashboard.html';
+                    }, 1500);
                 } else {
                     showMessage(data.message || 'Login gagal');
                 }
             } catch (error) {
-                console.error('Error:', error);
-                showMessage('Terjadi kesalahan saat login. Pastikan server API berjalan.');
+                console.error('Network error:', error);
+                showMessage('Tidak dapat terhubung ke server. Pastikan Anda terhubung ke internet.');
             } finally {
                 showLoading(false);
             }
@@ -250,38 +319,57 @@
                     // Switch ke tab login
                     document.getElementById('login-tab').click();
                     document.getElementById('login-id').value = id;
+                    document.getElementById('login-password').value = '';
                 } else {
                     showMessage(data.message || 'Gagal membuat storage');
                 }
             } catch (error) {
-                console.error('Error:', error);
-                showMessage('Terjadi kesalahan saat membuat storage. Pastikan server API berjalan.');
+                console.error('Network error:', error);
+                showMessage('Tidak dapat terhubung ke server. Pastikan Anda terhubung ke internet.');
             } finally {
                 showLoading(false);
             }
         });
         
-        // Cek apakah user sudah login
-        async function checkAuth() {
+        // Cek status API saat halaman dimuat
+        async function checkAPIStatus() {
             try {
                 const response = await fetch('/api/auth/check', {
                     method: 'GET',
                     credentials: 'include'
                 });
                 
-                const { ok } = await handleFetchResponse(response);
-                
-                if (ok) {
-                    // Jika sudah login, redirect ke dashboard
-                    window.location.href = '/dashboard.html';
+                // Jika response 404, tampilkan peringatan bahwa API sedang development
+                if (response.status === 404) {
+                    document.getElementById('api-status').classList.remove('hidden');
                 }
             } catch (error) {
-                console.error('Auth check error:', error);
+                console.error('API status check error:', error);
+                document.getElementById('api-status').classList.remove('hidden');
             }
         }
         
-        // Jalankan pengecekan auth saat halaman dimuat
-        checkAuth();
+        // Jalankan pengecekan status API saat halaman dimuat
+        checkAPIStatus();
+        
+        // Mode gelap/terang toggle
+        const darkModeToggle = document.createElement('button');
+        darkModeToggle.className = 'fixed top-4 right-4 p-2 rounded-full bg-gray-200 dark:bg-gray-700';
+        darkModeToggle.innerHTML = '<i data-lucide="moon" class="dark:hidden"></i><i data-lucide="sun" class="hidden dark:block"></i>';
+        darkModeToggle.addEventListener('click', () => {
+            document.documentElement.classList.toggle('dark');
+            localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
+            lucide.createIcons(); // Perbarui icon setelah toggle
+        });
+        document.body.appendChild(darkModeToggle);
+        
+        // Terapkan mode gelap jika disimpan di localStorage
+        if (localStorage.getItem('darkMode') === 'true') {
+            document.documentElement.classList.add('dark');
+        }
+        
+        // Perbarui icon setelah elemen ditambahkan
+        setTimeout(() => lucide.createIcons(), 100);
     </script>
 </body>
 </html>
