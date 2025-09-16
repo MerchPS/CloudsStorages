@@ -1,30 +1,21 @@
-// api/auth/login.js
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
   try {
-    const { username, password } = req.body;
+    const { id, password } = req.body; // pakai id biar sama dengan register
 
-    console.log("=== LOGIN REQUEST BODY ===", { username, password });
+    console.log("=== LOGIN REQUEST BODY ===", { id, password });
 
-    if (!username || !password) {
-      return res.status(400).json({ error: "Username & password wajib diisi" });
+    if (!id || !password) {
+      return res.status(400).json({ error: "ID & password wajib diisi" });
     }
-
-    // Debug ENV
-    console.log("=== ENV JSONBIN_ID ===", process.env.JSONBIN_ID);
-    console.log(
-      "=== ENV JSONBIN_KEY ===",
-      process.env.JSONBIN_KEY ? "SET" : "NOT SET"
-    );
 
     if (!process.env.JSONBIN_ID || !process.env.JSONBIN_KEY) {
       return res.status(500).json({ error: "JSONBin config tidak tersedia" });
     }
 
-    // Ambil data dari JSONBin
     const response = await fetch(
       `https://api.jsonbin.io/v3/b/${process.env.JSONBIN_ID}/latest`,
       {
@@ -51,10 +42,9 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "Format JSONBin tidak sesuai" });
     }
 
-    // Cari user di array
     const users = Array.isArray(data.record) ? data.record : [];
     const user = users.find(
-      (u) => u.username === username && u.password === password
+      (u) => u.id === id && u.password === password
     );
 
     console.log("=== USER FOUND ===", user);
@@ -65,7 +55,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       success: true,
-      user: { username: user.username, createdAt: user.createdAt },
+      user: { id: user.id, createdAt: user.createdAt },
     });
   } catch (err) {
     console.error("=== LOGIN ERROR ===", err);
