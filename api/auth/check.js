@@ -1,7 +1,5 @@
 const jwt = require('jsonwebtoken');
-
-// Simpan data user sementara (dalam produksi, gunakan database)
-const users = new Map();
+const cookie = require('cookie');
 
 module.exports = async (req, res) => {
   // Set CORS headers
@@ -20,7 +18,9 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const token = req.cookies?.token;
+    // Parse cookie dari header
+    const cookies = cookie.parse(req.headers.cookie || '');
+    const token = cookies.token;
 
     if (!token) {
       return res.status(401).json({ message: 'Tidak terautentikasi' });
@@ -28,14 +28,9 @@ module.exports = async (req, res) => {
 
     // Verifikasi token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    // Cek apakah user masih ada
-    const user = users.get(decoded.userId);
-    if (!user) {
-      return res.status(401).json({ message: 'Token tidak valid' });
-    }
 
-    res.status(200).json({ authenticated: true, userId: decoded.userId });
+    // Kalau berhasil, balikin user info dari token
+    res.status(200).json({ authenticated: true, userId: decoded.userId, binId: decoded.binId });
   } catch (error) {
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({ message: 'Token tidak valid' });
@@ -43,7 +38,7 @@ module.exports = async (req, res) => {
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({ message: 'Token kedaluwarsa' });
     }
-    
+
     console.error('Auth check error:', error);
     res.status(500).json({ message: 'Terjadi kesalahan server' });
   }
