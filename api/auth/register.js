@@ -1,76 +1,44 @@
-const bcrypt = require('bcryptjs');
+import fetch from "node-fetch";
 
-const users = new Map();
+export default async function handler(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ message: "Method not allowed" });
+  }
 
-module.exports = async (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  const { id, password } = req.body;
 
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ message: 'Method not allowed' });
+  if (!id || !password) {
+    return res.status(400).json({ message: "ID dan Password wajib diisi" });
+  }
 
   try {
-    const { id, password } = req.body;
-
-    if (!id || !password) {
-      return res.status(400).json({ message: 'ID dan password diperlukan' });
-    }
-    if (id.length < 3) {
-      return res.status(400).json({ message: 'ID harus minimal 3 karakter' });
-    }
-    if (password.length < 6) {
-      return res.status(400).json({ message: 'Password harus minimal 6 karakter' });
-    }
-    if (users.has(id)) {
-      return res.status(400).json({ message: 'ID sudah digunakan' });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 12);
-
-    users.set(id, {
-      id,
-      password: hashedPassword,
-      createdAt: new Date().toISOString()
+    // Simpan user ke JSONBin
+    const binResponse = await fetch("https://api.jsonbin.io/v3/b", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Master-Key": process.env.JSONBIN_MASTER_KEY,
+        "X-Bin-Name": `cloud-storage-${id}`,
+      },
+      body: JSON.stringify({
+        id, // simpan user id
+        password, // simpan password (plain, kalau mau aman bisa pakai bcryptjs)
+        files: [],
+        folders: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }),
     });
 
-    // Buat storage di JSONBin
-    try {
-      const binResponse = await fetch('https://api.jsonbin.io/v3/b', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Master-Key': process.env.JSONBIN_MASTER_KEY,
-          'X-Bin-Name': `cloud-storage-${id}`
-        },
-        body: JSON.stringify({
-          files: [],
-          folders: [],
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        })
-      });
+    const data = await binResponse.json();
 
-      const binData = await binResponse.json();
-
-      if (!binResponse.ok) {
-        console.error('Error creating JSONBin:', binData);
-        users.delete(id);
-        return res.status(500).json({ message: 'Gagal membuat storage' });
-      }
-
-      users.get(id).binId = binData.metadata.id;
-
-    } catch (error) {
-      console.error('Error creating JSONBin:', error);
-      users.delete(id);
-      return res.status(500).json({ message: 'Gagal membuat storage' });
+    if (!binResponse.ok) {
+      return res.status(500).json({ message: "Gagal menyimpan user", error: data });
     }
 
-    res.status(201).json({ message: 'Storage berhasil dibuat' });
+    return res.status(200).json({ message: "Registrasi berhasil", binId: data.metadata.id });
   } catch (error) {
-    console.error('Register error:', error);
-    res.status(500).json({ message: 'Terjadi kesalahan server' });
+    console.error("=== REGISTER ERROR ===", error);
+    return res.status(500).json({ message: "Internal server error" });
   }
-};
+}
