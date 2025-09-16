@@ -14,30 +14,26 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Cari semua bin user
-    const searchResponse = await fetch("https://api.jsonbin.io/v3/c", {
-      method: "GET",
-      headers: {
-        "X-Master-Key": process.env.JSONBIN_MASTER_KEY,
-      },
-    });
+    // Cari bin user berdasarkan nama
+    const searchResponse = await fetch(
+      `https://api.jsonbin.io/v3/b?meta=true&name=cloud-storage-${id}`,
+      {
+        method: "GET",
+        headers: {
+          "X-Master-Key": process.env.JSONBIN_MASTER_KEY,
+        },
+      }
+    );
 
     const searchData = await searchResponse.json();
 
-    if (!searchResponse.ok) {
-      return res.status(500).json({ message: "Gagal mencari user", error: searchData });
-    }
-
-    // Cari bin dengan nama sesuai id user
-    const userBin = searchData.records.find(
-      (r) => r.metadata.name === `cloud-storage-${id}`
-    );
-
-    if (!userBin) {
+    if (!searchResponse.ok || !searchData || !searchData.records || searchData.records.length === 0) {
       return res.status(401).json({ message: "User tidak ditemukan" });
     }
 
-    // Ambil data user dari bin
+    const userBin = searchData.records[0];
+
+    // Ambil isi bin
     const userResponse = await fetch(
       `https://api.jsonbin.io/v3/b/${userBin.metadata.id}/latest`,
       {
@@ -66,7 +62,7 @@ export default async function handler(req, res) {
       expiresIn: "1h",
     });
 
-    // Set cookie HTTP-only
+    // Set cookie
     res.setHeader(
       "Set-Cookie",
       cookie.serialize("token", token, {
@@ -74,7 +70,7 @@ export default async function handler(req, res) {
         secure: process.env.NODE_ENV === "production",
         sameSite: "strict",
         path: "/",
-        maxAge: 60 * 60, // 1 jam
+        maxAge: 60 * 60,
       })
     );
 
