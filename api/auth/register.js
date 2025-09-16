@@ -1,3 +1,5 @@
+import bcrypt from "bcryptjs";
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ message: "Method not allowed" });
@@ -6,11 +8,14 @@ export default async function handler(req, res) {
   const { id, password } = req.body;
 
   if (!id || !password) {
-    return res.status(400).json({ message: "ID dan Password wajib diisi" });
+    return res.status(400).json({ message: "ID dan password wajib diisi" });
   }
 
   try {
-    // Simpan user ke JSONBin
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Buat bin untuk user
     const binResponse = await fetch("https://api.jsonbin.io/v3/b", {
       method: "POST",
       headers: {
@@ -20,7 +25,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         id,
-        password,
+        password: hashedPassword,
         files: [],
         folders: [],
         createdAt: new Date().toISOString(),
@@ -28,13 +33,25 @@ export default async function handler(req, res) {
       }),
     });
 
-    const data = await binResponse.json();
+    const binData = await binResponse.json();
 
     if (!binResponse.ok) {
-      return res.status(500).json({ message: "Gagal menyimpan user", error: data });
+      return res.status(500).json({ message: "Gagal membuat storage", error: binData });
     }
 
-    return res.status(200).json({ message: "Registrasi berhasil", binId: data.metadata.id });
+    const binId = binData.metadata.id;
+
+    // Simpan user ke daftar users.json
+    await fetch(process.env.JSONBIN_USERS_URL, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Master-Key": process.env.JSONBIN_MASTER_KEY,
+      },
+      body: JSON.stringify({ id, binId }),
+    });
+
+    return res.status(201).json({ message: "User berhasil dibuat", binId });
   } catch (error) {
     console.error("=== REGISTER ERROR ===", error);
     return res.status(500).json({ message: "Internal server error" });
