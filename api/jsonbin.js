@@ -1,3 +1,5 @@
+const jwt = require('jsonwebtoken');
+
 module.exports = async (req, res) => {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
@@ -17,8 +19,7 @@ module.exports = async (req, res) => {
   }
 
   try {
-    // Verifikasi token (gunakan library jwt di production)
-    const jwt = require('jsonwebtoken');
+    // Verifikasi token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
     const { binId } = decoded;
@@ -27,7 +28,7 @@ module.exports = async (req, res) => {
     }
 
     // Route berdasarkan path dan method
-    const path = req.url.split('?')[0];
+    const path = req.url;
 
     if (req.method === 'GET' && path === '/api/jsonbin') {
       // Ambil data dari JSONBin
