@@ -1,3 +1,4 @@
+import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import cookie from "cookie";
 
@@ -10,59 +11,41 @@ export default async function handler(req, res) {
   console.log("=== LOGIN REQUEST BODY ===", req.body);
 
   if (!id || !password) {
-    return res.status(400).json({ message: "ID dan Password wajib diisi" });
+    return res.status(400).json({ message: "ID dan password wajib diisi" });
   }
 
   try {
-    // Cari bin user berdasarkan nama
-    const searchResponse = await fetch(
-      `https://api.jsonbin.io/v3/b?meta=true&name=cloud-storage-${id}`,
-      {
-        method: "GET",
-        headers: {
-          "X-Master-Key": process.env.JSONBIN_MASTER_KEY,
-        },
-      }
-    );
+    // Ambil daftar user dari JSONBin
+    const usersResponse = await fetch(process.env.JSONBIN_USERS_URL, {
+      headers: { "X-Master-Key": process.env.JSONBIN_MASTER_KEY },
+    });
+    const usersData = await usersResponse.json();
 
-    const searchData = await searchResponse.json();
-
-    if (!searchResponse.ok || !searchData || !searchData.records || searchData.records.length === 0) {
+    const userEntry = usersData.record.find((u) => u.id === id);
+    if (!userEntry) {
       return res.status(401).json({ message: "User tidak ditemukan" });
     }
 
-    const userBin = searchData.records[0];
-
-    // Ambil isi bin
+    // Ambil data user dari binId
     const userResponse = await fetch(
-      `https://api.jsonbin.io/v3/b/${userBin.metadata.id}/latest`,
-      {
-        method: "GET",
-        headers: {
-          "X-Master-Key": process.env.JSONBIN_MASTER_KEY,
-        },
-      }
+      `https://api.jsonbin.io/v3/b/${userEntry.binId}/latest`,
+      { headers: { "X-Master-Key": process.env.JSONBIN_MASTER_KEY } }
     );
-
     const userData = await userResponse.json();
-
-    if (!userResponse.ok) {
-      return res.status(500).json({ message: "Gagal membaca data user", error: userData });
-    }
 
     const user = userData.record;
 
     // Cek password
-    if (user.password !== password) {
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
       return res.status(401).json({ message: "Password salah" });
     }
 
-    // Buat JWT token
+    // Buat JWT
     const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, {
       expiresIn: "1h",
     });
 
-    // Set cookie
     res.setHeader(
       "Set-Cookie",
       cookie.serialize("token", token, {
@@ -70,7 +53,7 @@ export default async function handler(req, res) {
         secure: process.env.NODE_ENV === "production",
         sameSite: "strict",
         path: "/",
-        maxAge: 60 * 60,
+        maxAge: 3600,
       })
     );
 
