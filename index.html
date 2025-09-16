@@ -1,100 +1,263 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="id" class="h-full">
 <head>
-  <meta charset="UTF-8">
-  <title>Cloud Storage JSONBin</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: linear-gradient(135deg, #1d3557, #457b9d);
-      color: white;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      margin: 0;
-    }
-    .container {
-      background: rgba(255, 255, 255, 0.1);
-      padding: 20px;
-      border-radius: 12px;
-      width: 400px;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.3);
-      animation: fadeIn 1s ease-in-out;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(20px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    input, textarea, select, button {
-      width: 100%;
-      padding: 10px;
-      margin: 6px 0;
-      border: none;
-      border-radius: 6px;
-    }
-    button {
-      background: #06d6a0;
-      color: white;
-      font-weight: bold;
-      cursor: pointer;
-    }
-    button:hover {
-      background: #04b383;
-    }
-    pre {
-      background: rgba(0,0,0,0.4);
-      padding: 10px;
-      border-radius: 6px;
-      overflow-x: auto;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CloudStorage Enchanted++</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@tailwindcss/forms@0.5.6/dist/forms.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+    </style>
 </head>
-<body>
-  <div class="container">
-    <h2>Cloud Storage JSONBin</h2>
-    <select id="apiSet">
-      <option value="1">API Set 1</option>
-      <option value="2">API Set 2</option>
-    </select>
-    <input type="text" id="binId" placeholder="Masukkan Bin ID">
-    <textarea id="dataInput" rows="4" placeholder='{"msg": "halo"}'></textarea>
-    <button onclick="saveData()">Simpan Data</button>
-    <button onclick="loadData()">Ambil Data</button>
-    <h3>Hasil:</h3>
-    <pre id="output"></pre>
-  </div>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-800 dark:to-gray-900 min-h-full flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-md w-full space-y-8 bg-white dark:bg-gray-800 p-10 rounded-xl shadow-lg fade-in">
+        <div>
+            <div class="flex justify-center items-center">
+                <i data-lucide="cloud" class="w-12 h-12 text-blue-500"></i>
+            </div>
+            <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
+                CloudStorage Enchanted++
+            </h2>
+            <p class="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
+                Simpan file Anda dengan aman di cloud
+            </p>
+        </div>
+        
+        <!-- Tabs untuk Login dan Create Storage -->
+        <div class="mt-8">
+            <div class="flex border-b border-gray-200 dark:border-gray-700">
+                <button id="login-tab" class="py-2 px-4 font-medium text-center text-blue-600 dark:text-blue-400 border-b-2 border-blue-500 dark:border-blue-400 flex-1">Login</button>
+                <button id="create-tab" class="py-2 px-4 font-medium text-center text-gray-500 dark:text-gray-400 flex-1">Buat Storage</button>
+            </div>
+            
+            <!-- Form Login -->
+            <div id="login-form" class="mt-8 space-y-6">
+                <div class="rounded-md shadow-sm -space-y-px">
+                    <div>
+                        <label for="login-id" class="sr-only">ID Storage</label>
+                        <input id="login-id" name="login-id" type="text" required class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white dark:bg-gray-700 rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm" placeholder="ID Storage">
+                    </div>
+                    <div>
+                        <label for="login-password" class="sr-only">Password</label>
+                        <input id="login-password" name="login-password" type="password" required class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white dark:bg-gray-700 rounded-b-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm" placeholder="Password">
+                    </div>
+                </div>
 
-  <script>
-    async function saveData() {
-      const binId = document.getElementById("binId").value;
-      const apiSet = document.getElementById("apiSet").value;
-      const data = JSON.parse(document.getElementById("dataInput").value);
+                <div>
+                    <button id="login-button" class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        <span class="absolute left-0 inset-y-0 flex items-center pl-3">
+                            <i data-lucide="log-in" class="h-5 w-5 text-blue-300 group-hover:text-blue-200"></i>
+                        </span>
+                        Masuk ke Storage
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Form Create Storage -->
+            <div id="create-form" class="mt-8 space-y-6 hidden">
+                <div class="rounded-md shadow-sm -space-y-px">
+                    <div>
+                        <label for="create-id" class="sr-only">ID Storage Baru</label>
+                        <input id="create-id" name="create-id" type="text" required class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white dark:bg-gray-700 rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm" placeholder="ID Storage Baru">
+                    </div>
+                    <div>
+                        <label for="create-password" class="sr-only">Password</label>
+                        <input id="create-password" name="create-password" type="password" required class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white dark:bg-gray-700 rounded-b-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm" placeholder="Password">
+                    </div>
+                </div>
 
-      const res = await fetch("/api/jsonbin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ binId, apiSet, data })
-      });
+                <div>
+                    <button id="create-button" class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                        <span class="absolute left-0 inset-y-0 flex items-center pl-3">
+                            <i data-lucide="plus-circle" class="h-5 w-5 text-green-300 group-hover:text-green-200"></i>
+                        </span>
+                        Buat Storage Baru
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="message" class="hidden mt-4 p-3 rounded-md text-sm"></div>
+    </div>
 
-      const result = await res.json();
-      document.getElementById("output").textContent = JSON.stringify(result, null, 2);
-    }
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-70 flex items-center justify-center z-50 hidden">
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl flex flex-col items-center">
+            <i data-lucide="loader" class="w-10 h-10 text-blue-500 animate-spin"></i>
+            <p class="mt-4 text-gray-700 dark:text-gray-300">CloudStorage Enchanted++ Loading…</p>
+        </div>
+    </div>
 
-    async function loadData() {
-      const binId = document.getElementById("binId").value;
-      const apiSet = document.getElementById("apiSet").value;
-
-      const res = await fetch("/api/jsonbin", {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ binId, apiSet })
-      });
-
-      const result = await res.json();
-      document.getElementById("output").textContent = JSON.stringify(result, null, 2);
-    }
-  </script>
+    <script>
+        // Inisialisasi Lucide Icons
+        lucide.createIcons();
+        
+        // Toggle antara Login dan Create Form
+        document.getElementById('login-tab').addEventListener('click', () => {
+            document.getElementById('login-form').classList.remove('hidden');
+            document.getElementById('create-form').classList.add('hidden');
+            document.getElementById('login-tab').classList.add('text-blue-600', 'dark:text-blue-400', 'border-b-2', 'border-blue-500', 'dark:border-blue-400');
+            document.getElementById('login-tab').classList.remove('text-gray-500', 'dark:text-gray-400');
+            document.getElementById('create-tab').classList.add('text-gray-500', 'dark:text-gray-400');
+            document.getElementById('create-tab').classList.remove('text-blue-600', 'dark:text-blue-400', 'border-b-2', 'border-blue-500', 'dark:border-blue-400');
+        });
+        
+        document.getElementById('create-tab').addEventListener('click', () => {
+            document.getElementById('create-form').classList.remove('hidden');
+            document.getElementById('login-form').classList.add('hidden');
+            document.getElementById('create-tab').classList.add('text-blue-600', 'dark:text-blue-400', 'border-b-2', 'border-blue-500', 'dark:border-blue-400');
+            document.getElementById('create-tab').classList.remove('text-gray-500', 'dark:text-gray-400');
+            document.getElementById('login-tab').classList.add('text-gray-500', 'dark:text-gray-400');
+            document.getElementById('login-tab').classList.remove('text-blue-600', 'dark:text-blue-400', 'border-b-2', 'border-blue-500', 'dark:border-blue-400');
+        });
+        
+        // Fungsi untuk menampilkan pesan
+        function showMessage(message, type = 'error') {
+            const messageEl = document.getElementById('message');
+            messageEl.textContent = message;
+            messageEl.className = `mt-4 p-3 rounded-md text-sm ${type === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`;
+            messageEl.classList.remove('hidden');
+            
+            // Sembunyikan pesan setelah 5 detik
+            setTimeout(() => {
+                messageEl.classList.add('hidden');
+            }, 5000);
+        }
+        
+        // Fungsi untuk menampilkan loading
+        function showLoading(show) {
+            document.getElementById('loading-overlay').classList.toggle('hidden', !show);
+        }
+        
+        // Event listener untuk login
+        document.getElementById('login-button').addEventListener('click', async () => {
+            const id = document.getElementById('login-id').value.trim();
+            const password = document.getElementById('login-password').value;
+            
+            if (!id || !password) {
+                showMessage('ID dan password harus diisi');
+                return;
+            }
+            
+            showLoading(true);
+            
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ id, password }),
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Redirect ke dashboard
+                    window.location.href = '/dashboard.html';
+                } else {
+                    showMessage(data.message || 'Login gagal');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showMessage('Terjadi kesalahan saat login');
+            } finally {
+                showLoading(false);
+            }
+        });
+        
+        // Event listener untuk create storage
+        document.getElementById('create-button').addEventListener('click', async () => {
+            const id = document.getElementById('create-id').value.trim();
+            const password = document.getElementById('create-password').value;
+            
+            if (!id || !password) {
+                showMessage('ID dan password harus diisi');
+                return;
+            }
+            
+            if (id.length < 3) {
+                showMessage('ID harus minimal 3 karakter');
+                return;
+            }
+            
+            if (password.length < 6) {
+                showMessage('Password harus minimal 6 karakter');
+                return;
+            }
+            
+            showLoading(true);
+            
+            try {
+                const response = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ id, password }),
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showMessage('Storage berhasil dibuat! Silakan login.', 'success');
+                    // Switch ke tab login
+                    document.getElementById('login-tab').click();
+                    document.getElementById('login-id').value = id;
+                } else {
+                    showMessage(data.message || 'Gagal membuat storage');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showMessage('Terjadi kesalahan saat membuat storage');
+            } finally {
+                showLoading(false);
+            }
+        });
+        
+        // Cek apakah user sudah login
+        async function checkAuth() {
+            try {
+                const response = await fetch('/api/auth/check', {
+                    method: 'GET',
+                    credentials: 'include'
+                });
+                
+                if (response.ok) {
+                    // Jika sudah login, redirect ke dashboard
+                    window.location.href = '/dashboard.html';
+                }
+            } catch (error) {
+                console.error('Auth check error:', error);
+            }
+        }
+        
+        // Jalankan pengecekan auth saat halaman dimuat
+        checkAuth();
+    </script>
 </body>
 </html>
