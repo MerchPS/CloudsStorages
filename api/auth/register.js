@@ -32,33 +32,25 @@ module.exports = async (req, res) => {
       return res.status(400).json({ message: 'Password harus minimal 6 karakter' });
     }
 
-    // 1. Ambil data users dari JSONBin (users database)
-    const usersBinResponse = await fetch(`https://api.jsonbin.io/v3/b/${process.env.USERS_BIN_ID}`, {
+    // 1. Cek apakah user sudah ada dengan mencari bin berdasarkan nama
+    const searchResponse = await fetch(`https://api.jsonbin.io/v3/b?meta=false&q=name:cloud-storage-${id}`, {
       method: 'GET',
       headers: {
-        'X-Master-Key': process.env.JSONBIN_MASTER_KEY,
-        'X-Bin-Meta': false
+        'X-Master-Key': process.env.JSONBIN_MASTER_KEY
       }
     });
 
-    if (!usersBinResponse.ok) {
-      console.error('Error fetching users data:', usersBinResponse.status);
-      return res.status(500).json({ message: 'Server error: Cannot access users database' });
+    if (searchResponse.ok) {
+      const searchResults = await searchResponse.json();
+      if (searchResults && searchResults.length > 0) {
+        return res.status(400).json({ message: 'ID sudah digunakan' });
+      }
     }
 
-    const usersData = await usersBinResponse.json();
-    const users = new Map(usersData.users || []);
-
-    // 2. Cek apakah ID sudah digunakan
-    if (users.has(id)) {
-      return res.status(400).json({ message: 'ID sudah digunakan' });
-    }
-
-    // 3. Hash password
-    console.log('Hashing password for user:', id);
+    // 2. Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // 4. Buat storage bin untuk user
+    // 3. Buat bin untuk user baru
     const binResponse = await fetch('https://api.jsonbin.io/v3/b', {
       method: 'POST',
       headers: {
@@ -67,6 +59,8 @@ module.exports = async (req, res) => {
         'X-Bin-Name': `cloud-storage-${id}`
       },
       body: JSON.stringify({
+        id: id,
+        password: hashedPassword,
         files: [],
         folders: [{ id: 'root', name: 'Root', children: [] }],
         createdAt: new Date().toISOString(),
@@ -79,39 +73,6 @@ module.exports = async (req, res) => {
     if (!binResponse.ok) {
       console.error('Error creating JSONBin:', binData);
       return res.status(500).json({ message: 'Gagal membuat storage' });
-    }
-
-    // 5. Simpan user ke users database
-    users.set(id, {
-      id,
-      password: hashedPassword,
-      binId: binData.metadata.id,
-      createdAt: new Date().toISOString()
-    });
-
-    // 6. Update users database di JSONBin
-    const updateUsersResponse = await fetch(`https://api.jsonbin.io/v3/b/${process.env.USERS_BIN_ID}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Master-Key': process.env.JSONBIN_MASTER_KEY
-      },
-      body: JSON.stringify({
-        users: Array.from(users.entries()),
-        updatedAt: new Date().toISOString()
-      })
-    });
-
-    if (!updateUsersResponse.ok) {
-      console.error('Error updating users database:', updateUsersResponse.status);
-      // Rollback: Hapus user bin yang sudah dibuat
-      await fetch(`https://api.jsonbin.io/v3/b/${binData.metadata.id}`, {
-        method: 'DELETE',
-        headers: {
-          'X-Master-Key': process.env.JSONBIN_MASTER_KEY
-        }
-      });
-      return res.status(500).json({ message: 'Gagal menyimpan data user' });
     }
 
     console.log('User registered successfully:', id);
