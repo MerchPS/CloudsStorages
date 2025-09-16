@@ -29,8 +29,8 @@ module.exports = async (req, res) => {
     // Verifikasi token
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-key-for-development');
     
-    // Ambil data users untuk memverifikasi user masih ada
-    const usersBinResponse = await fetch(`https://api.jsonbin.io/v3/b/${process.env.USERS_BIN_ID}`, {
+    // Verifikasi bahwa bin user masih ada
+    const binResponse = await fetch(`https://api.jsonbin.io/v3/b/${decoded.binId}`, {
       method: 'GET',
       headers: {
         'X-Master-Key': process.env.JSONBIN_MASTER_KEY,
@@ -38,15 +38,7 @@ module.exports = async (req, res) => {
       }
     });
 
-    if (!usersBinResponse.ok) {
-      return res.status(500).json({ message: 'Server error: Cannot access users database' });
-    }
-
-    const usersData = await usersBinResponse.json();
-    const users = new Map(usersData.users || []);
-
-    // Cek apakah user masih ada
-    if (!users.has(decoded.userId)) {
+    if (!binResponse.ok) {
       return res.status(401).json({ message: 'Token tidak valid' });
     }
 
