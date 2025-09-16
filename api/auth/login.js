@@ -27,8 +27,29 @@ module.exports = async (req, res) => {
 
     console.log('Login attempt for user:', id);
 
-    // 1. Ambil data users dari JSONBin (users database)
-    const usersBinResponse = await fetch(`https://api.jsonbin.io/v3/b/${process.env.USERS_BIN_ID}`, {
+    // 1. Cari bin user berdasarkan nama
+    const searchResponse = await fetch(`https://api.jsonbin.io/v3/b?meta=false&q=name:cloud-storage-${id}`, {
+      method: 'GET',
+      headers: {
+        'X-Master-Key': process.env.JSONBIN_MASTER_KEY
+      }
+    });
+
+    if (!searchResponse.ok) {
+      console.error('Error searching for user bin:', searchResponse.status);
+      return res.status(500).json({ message: 'Server error: Cannot search user database' });
+    }
+
+    const searchResults = await searchResponse.json();
+    
+    if (!searchResults || searchResults.length === 0) {
+      console.log('User bin not found for:', id);
+      return res.status(401).json({ message: 'ID atau password salah' });
+    }
+
+    // 2. Ambil data user dari bin yang ditemukan
+    const userBinId = searchResults[0].record.id || searchResults[0].record.metadata?.id;
+    const userBinResponse = await fetch(`https://api.jsonbin.io/v3/b/${userBinId}`, {
       method: 'GET',
       headers: {
         'X-Master-Key': process.env.JSONBIN_MASTER_KEY,
@@ -36,24 +57,23 @@ module.exports = async (req, res) => {
       }
     });
 
-    if (!usersBinResponse.ok) {
-      console.error('Error fetching users data:', usersBinResponse.status);
-      return res.status(500).json({ message: 'Server error: Cannot access users database' });
+    if (!userBinResponse.ok) {
+      console.error('Error fetching user data:', userBinResponse.status);
+      return res.status(500).json({ message: 'Server error: Cannot access user data' });
     }
 
-    const usersData = await usersBinResponse.json();
-    const users = new Map(usersData.users || []);
-
-    // 2. Cek apakah user ada
-    if (!users.has(id)) {
-      console.log('User not found:', id);
-      return res.status(401).json({ message: 'ID atau password salah' });
-    }
-
-    const user = users.get(id);
+    const userData = await userBinResponse.json();
 
     // 3. Verifikasi password
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    console.log('User data found:', userData);
+    
+    // Periksa apakah data user memiliki struktur yang benar
+    if (!userData.password) {
+      console.error('User data structure invalid:', userData);
+      return res.status(500).json({ message: 'Struktur data user tidak valid' });
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, userData.password);
     console.log('Password validation result:', isPasswordValid);
     
     if (!isPasswordValid) {
@@ -62,7 +82,7 @@ module.exports = async (req, res) => {
 
     // 4. Buat JWT token
     const token = jwt.sign(
-      { userId: user.id, binId: user.binId },
+      { userId: id, binId: userBinId },
       process.env.JWT_SECRET || 'fallback-secret-key-for-development',
       { expiresIn: '24h' }
     );
