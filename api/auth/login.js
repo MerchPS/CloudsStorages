@@ -1,64 +1,87 @@
+import fetch from "node-fetch";
+import jwt from "jsonwebtoken";
+import cookie from "cookie";
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
+    return res.status(405).json({ message: "Method not allowed" });
+  }
+
+  const { id, password } = req.body;
+  console.log("=== LOGIN REQUEST BODY ===", req.body);
+
+  if (!id || !password) {
+    return res.status(400).json({ message: "ID dan Password wajib diisi" });
   }
 
   try {
-    const { id, password } = req.body; // pakai id biar sama dengan register
+    // Cari bin user dari JSONBin berdasarkan nama
+    const searchResponse = await fetch("https://api.jsonbin.io/v3/c", {
+      method: "GET",
+      headers: {
+        "X-Master-Key": process.env.JSONBIN_MASTER_KEY,
+      },
+    });
 
-    console.log("=== LOGIN REQUEST BODY ===", { id, password });
+    const searchData = await searchResponse.json();
 
-    if (!id || !password) {
-      return res.status(400).json({ error: "ID & password wajib diisi" });
+    if (!searchResponse.ok) {
+      return res.status(500).json({ message: "Gagal mencari user", error: searchData });
     }
 
-    if (!process.env.JSONBIN_ID || !process.env.JSONBIN_KEY) {
-      return res.status(500).json({ error: "JSONBin config tidak tersedia" });
+    // Cari bin dengan nama sesuai id user
+    const userBin = searchData.records.find(
+      (r) => r.metadata.name === `cloud-storage-${id}`
+    );
+
+    if (!userBin) {
+      return res.status(401).json({ message: "User tidak ditemukan" });
     }
 
-    const response = await fetch(
-      `https://api.jsonbin.io/v3/b/${process.env.JSONBIN_ID}/latest`,
+    // Ambil data user dari bin
+    const userResponse = await fetch(
+      `https://api.jsonbin.io/v3/b/${userBin.metadata.id}/latest`,
       {
+        method: "GET",
         headers: {
-          "X-Master-Key": process.env.JSONBIN_KEY,
+          "X-Master-Key": process.env.JSONBIN_MASTER_KEY,
         },
       }
     );
 
-    console.log("=== JSONBIN STATUS ===", response.status);
+    const userData = await userResponse.json();
 
-    let data;
-    try {
-      data = await response.json();
-    } catch (e) {
-      console.error("Gagal parse JSON:", e);
-      return res.status(500).json({ error: "Response JSONBin tidak valid" });
+    if (!userResponse.ok) {
+      return res.status(500).json({ message: "Gagal membaca data user", error: userData });
     }
 
-    console.log("=== JSONBIN RESPONSE ===", JSON.stringify(data, null, 2));
+    const user = userData.record;
 
-    if (!data.record) {
-      console.error("JSONBin tidak punya field 'record'");
-      return res.status(500).json({ error: "Format JSONBin tidak sesuai" });
+    // Cek password
+    if (user.password !== password) {
+      return res.status(401).json({ message: "Password salah" });
     }
 
-    const users = Array.isArray(data.record) ? data.record : [];
-    const user = users.find(
-      (u) => u.id === id && u.password === password
+    // Buat JWT token
+    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, {
+      expiresIn: "1h",
+    });
+
+    // Set cookie HTTP-only
+    res.setHeader(
+      "Set-Cookie",
+      cookie.serialize("token", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        path: "/",
+        maxAge: 60 * 60, // 1 jam
+      })
     );
 
-    console.log("=== USER FOUND ===", user);
-
-    if (!user) {
-      return res.status(401).json({ error: "Invalid credentials" });
-    }
-
-    return res.status(200).json({
-      success: true,
-      user: { id: user.id, createdAt: user.createdAt },
-    });
-  } catch (err) {
-    console.error("=== LOGIN ERROR ===", err);
-    return res.status(500).json({ error: "Internal server error" });
+    return res.status(200).json({ message: "Login berhasil", token });
+  } catch (error) {
+    console.error("=== LOGIN ERROR ===", error);
+    return res.status(500).json({ message: "Internal server error" });
   }
 }
