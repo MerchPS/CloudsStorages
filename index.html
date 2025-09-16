@@ -153,6 +153,27 @@
             document.getElementById('loading-overlay').classList.toggle('hidden', !show);
         }
         
+        // Fungsi untuk menangani response fetch dengan penanganan error yang lebih baik
+        async function handleFetchResponse(response) {
+            const contentType = response.headers.get('content-type');
+            
+            // Jika response adalah JSON, parse sebagai JSON
+            if (contentType && contentType.includes('application/json')) {
+                const data = await response.json();
+                return { ok: response.ok, data, status: response.status };
+            } 
+            // Jika response adalah HTML/teks, tangani sebagai error
+            else {
+                const text = await response.text();
+                console.error('Non-JSON response:', text.substring(0, 100) + '...');
+                return { 
+                    ok: false, 
+                    data: { message: 'Terjadi kesalahan server. Silakan coba lagi.' },
+                    status: response.status
+                };
+            }
+        }
+        
         // Event listener untuk login
         document.getElementById('login-button').addEventListener('click', async () => {
             const id = document.getElementById('login-id').value.trim();
@@ -172,11 +193,12 @@
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({ id, password }),
+                    credentials: 'include' // Penting untuk mengirim cookie
                 });
                 
-                const data = await response.json();
+                const { ok, data } = await handleFetchResponse(response);
                 
-                if (response.ok) {
+                if (ok) {
                     // Redirect ke dashboard
                     window.location.href = '/dashboard.html';
                 } else {
@@ -184,7 +206,7 @@
                 }
             } catch (error) {
                 console.error('Error:', error);
-                showMessage('Terjadi kesalahan saat login');
+                showMessage('Terjadi kesalahan saat login. Pastikan server API berjalan.');
             } finally {
                 showLoading(false);
             }
@@ -221,9 +243,9 @@
                     body: JSON.stringify({ id, password }),
                 });
                 
-                const data = await response.json();
+                const { ok, data } = await handleFetchResponse(response);
                 
-                if (response.ok) {
+                if (ok) {
                     showMessage('Storage berhasil dibuat! Silakan login.', 'success');
                     // Switch ke tab login
                     document.getElementById('login-tab').click();
@@ -233,7 +255,7 @@
                 }
             } catch (error) {
                 console.error('Error:', error);
-                showMessage('Terjadi kesalahan saat membuat storage');
+                showMessage('Terjadi kesalahan saat membuat storage. Pastikan server API berjalan.');
             } finally {
                 showLoading(false);
             }
@@ -247,7 +269,9 @@
                     credentials: 'include'
                 });
                 
-                if (response.ok) {
+                const { ok } = await handleFetchResponse(response);
+                
+                if (ok) {
                     // Jika sudah login, redirect ke dashboard
                     window.location.href = '/dashboard.html';
                 }
