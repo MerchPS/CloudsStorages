@@ -20,7 +20,7 @@ module.exports = async (req, res) => {
 
   try {
     // Verifikasi token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-key-for-development');
     
     const { binId } = decoded;
     if (!binId) {
@@ -34,7 +34,8 @@ module.exports = async (req, res) => {
       // Ambil data dari JSONBin
       const binResponse = await fetch(`https://api.jsonbin.io/v3/b/${binId}`, {
         headers: {
-          'X-Master-Key': process.env.JSONBIN_MASTER_KEY
+          'X-Master-Key': process.env.JSONBIN_MASTER_KEY,
+          'X-Bin-Meta': false
         }
       });
 
@@ -43,11 +44,32 @@ module.exports = async (req, res) => {
       }
 
       const binData = await binResponse.json();
-      res.status(200).json(binData.record);
+      
+      // Jangan kembalikan password ke client
+      if (binData.password) {
+        delete binData.password;
+      }
+      
+      res.status(200).json(binData);
     } 
     else if (req.method === 'PUT' && path === '/api/jsonbin') {
       // Update data di JSONBin
       const newData = req.body;
+      
+      // Pastikan password tidak diubah melalui endpoint ini
+      const currentBinResponse = await fetch(`https://api.jsonbin.io/v3/b/${binId}`, {
+        headers: {
+          'X-Master-Key': process.env.JSONBIN_MASTER_KEY,
+          'X-Bin-Meta': false
+        }
+      });
+      
+      if (currentBinResponse.ok) {
+        const currentData = await currentBinResponse.json();
+        if (currentData.password) {
+          newData.password = currentData.password; // Pertahankan password yang ada
+        }
+      }
 
       const binResponse = await fetch(`https://api.jsonbin.io/v3/b/${binId}`, {
         method: 'PUT',
