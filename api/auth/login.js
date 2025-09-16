@@ -1,4 +1,3 @@
-import fetch from "node-fetch";
 import jwt from "jsonwebtoken";
 import cookie from "cookie";
 
@@ -15,7 +14,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Cari bin user dari JSONBin berdasarkan nama
+    // Cari semua bin user
     const searchResponse = await fetch("https://api.jsonbin.io/v3/c", {
       method: "GET",
       headers: {
