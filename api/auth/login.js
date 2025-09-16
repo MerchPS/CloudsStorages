@@ -1,48 +1,46 @@
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
+import fetch from "node-fetch";
 
-const users = new Map();
-
-module.exports = async (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ message: 'Method not allowed' });
+export default async function handler(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
 
   try {
-    const { id, password } = req.body;
+    const { username, password } = req.body;
 
-    if (!id || !password) {
-      return res.status(400).json({ message: 'ID dan password diperlukan' });
-    }
+    console.log("=== LOGIN REQUEST BODY ===");
+    console.log("Username:", username);
+    console.log("Password:", password);
 
-    const user = users.get(id);
+    // Ambil data user dari JSONBin
+    const response = await fetch(`https://api.jsonbin.io/v3/b/${process.env.JSONBIN_ID}/latest`, {
+      headers: {
+        "X-Master-Key": process.env.JSONBIN_KEY,
+      },
+    });
+
+    const data = await response.json();
+
+    console.log("=== JSONBIN RESPONSE ===");
+    console.log(JSON.stringify(data, null, 2));
+
+    // Cari user
+    const user = data.record.find(
+      (u) => u.username === username && u.password === password
+    );
+
+    console.log("=== USER FOUND ===");
+    console.log(user);
+
     if (!user) {
-      return res.status(401).json({ message: 'ID atau password salah' });
+      console.log("Login gagal: user tidak ditemukan atau password salah.");
+      return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-      return res.status(401).json({ message: 'ID atau password salah' });
-    }
-
-    const token = jwt.sign(
-      { userId: user.id, binId: user.binId },
-      process.env.JWT_SECRET,
-      { expiresIn: '24h' }
-    );
-
-    res.setHeader(
-      'Set-Cookie',
-      `token=${token}; HttpOnly; Path=/; SameSite=Strict; Max-Age=86400${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`
-    );
-
-    res.status(200).json({ message: 'Login berhasil' });
-  } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ message: 'Terjadi kesalahan server' });
+    return res.status(200).json({ success: true, user });
+  } catch (err) {
+    console.error("=== LOGIN ERROR ===");
+    console.error(err);
+    return res.status(500).json({ error: "Internal server error" });
   }
-};
+}
