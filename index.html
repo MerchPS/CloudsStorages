@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Cloud Storage JSONBin</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #1d3557, #457b9d);
+      color: white;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .container {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 20px;
+      border-radius: 12px;
+      width: 400px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+      animation: fadeIn 1s ease-in-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    input, textarea, select, button {
+      width: 100%;
+      padding: 10px;
+      margin: 6px 0;
+      border: none;
+      border-radius: 6px;
+    }
+    button {
+      background: #06d6a0;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #04b383;
+    }
+    pre {
+      background: rgba(0,0,0,0.4);
+      padding: 10px;
+      border-radius: 6px;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Cloud Storage JSONBin</h2>
+    <select id="apiSet">
+      <option value="1">API Set 1</option>
+      <option value="2">API Set 2</option>
+    </select>
+    <input type="text" id="binId" placeholder="Masukkan Bin ID">
+    <textarea id="dataInput" rows="4" placeholder='{"msg": "halo"}'></textarea>
+    <button onclick="saveData()">Simpan Data</button>
+    <button onclick="loadData()">Ambil Data</button>
+    <h3>Hasil:</h3>
+    <pre id="output"></pre>
+  </div>
+
+  <script>
+    async function saveData() {
+      const binId = document.getElementById("binId").value;
+      const apiSet = document.getElementById("apiSet").value;
+      const data = JSON.parse(document.getElementById("dataInput").value);
+
+      const res = await fetch("/api/jsonbin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ binId, apiSet, data })
+      });
+
+      const result = await res.json();
+      document.getElementById("output").textContent = JSON.stringify(result, null, 2);
+    }
+
+    async function loadData() {
+      const binId = document.getElementById("binId").value;
+      const apiSet = document.getElementById("apiSet").value;
+
+      const res = await fetch("/api/jsonbin", {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ binId, apiSet })
+      });
+
+      const result = await res.json();
+      document.getElementById("output").textContent = JSON.stringify(result, null, 2);
+    }
+  </script>
+</body>
+</html>
