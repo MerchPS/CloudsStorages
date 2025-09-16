@@ -1,56 +1,41 @@
 const bcrypt = require('bcryptjs');
 
-// Simpan data user sementara (dalam produksi, gunakan database)
 const users = new Map();
 
 module.exports = async (req, res) => {
-  // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
 
-  // Handle preflight request
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
-  if (req.method !== 'POST') {
-    return res.status(405).json({ message: 'Method not allowed' });
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ message: 'Method not allowed' });
 
   try {
     const { id, password } = req.body;
 
-    // Validasi input
     if (!id || !password) {
       return res.status(400).json({ message: 'ID dan password diperlukan' });
     }
-
     if (id.length < 3) {
       return res.status(400).json({ message: 'ID harus minimal 3 karakter' });
     }
-
     if (password.length < 6) {
       return res.status(400).json({ message: 'Password harus minimal 6 karakter' });
     }
-
-    // Cek apakah ID sudah digunakan
     if (users.has(id)) {
       return res.status(400).json({ message: 'ID sudah digunakan' });
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Simpan user (dalam produksi, simpan ke database)
     users.set(id, {
       id,
       password: hashedPassword,
       createdAt: new Date().toISOString()
     });
 
-    // Buat struktur data awal di JSONBin
+    // Buat storage di JSONBin
     try {
       const binResponse = await fetch('https://api.jsonbin.io/v3/b', {
         method: 'POST',
@@ -71,16 +56,15 @@ module.exports = async (req, res) => {
 
       if (!binResponse.ok) {
         console.error('Error creating JSONBin:', binData);
-        users.delete(id); // Hapus user jika gagal membuat bin
+        users.delete(id);
         return res.status(500).json({ message: 'Gagal membuat storage' });
       }
 
-      // Simpan binId ke user data
       users.get(id).binId = binData.metadata.id;
 
     } catch (error) {
       console.error('Error creating JSONBin:', error);
-      users.delete(id); // Hapus user jika gagal membuat bin
+      users.delete(id);
       return res.status(500).json({ message: 'Gagal membuat storage' });
     }
 
