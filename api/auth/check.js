@@ -1,35 +1,20 @@
-const jwt = require('jsonwebtoken');
-const cookie = require('cookie');
+import jwt from "jsonwebtoken";
+import cookie from "cookie";
 
-module.exports = async (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'GET') return res.status(405).json({ message: 'Method not allowed' });
-
+export default async function handler(req, res) {
   try {
-    const cookies = cookie.parse(req.headers.cookie || '');
+    const cookies = req.headers.cookie ? cookie.parse(req.headers.cookie) : {};
     const token = cookies.token;
 
     if (!token) {
-      return res.status(401).json({ message: 'Tidak terautentikasi' });
+      return res.status(401).json({ message: "Unauthorized" });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    res.status(200).json({ authenticated: true, userId: decoded.userId, binId: decoded.binId });
+    return res.status(200).json({ message: "Authorized", user: decoded });
   } catch (error) {
-    if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({ message: 'Token tidak valid' });
-    }
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({ message: 'Token kedaluwarsa' });
-    }
-
-    console.error('Auth check error:', error);
-    res.status(500).json({ message: 'Terjadi kesalahan server' });
+    console.error("=== CHECK ERROR ===", error);
+    return res.status(401).json({ message: "Unauthorized" });
   }
-};
+}
