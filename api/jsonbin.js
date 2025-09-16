@@ -1,44 +1,81 @@
-export default async function handler(req, res) {
-  const { method } = req;
-  const { binId, apiSet, data } = req.body || {};
+module.exports = async (req, res) => {
+  // Set CORS headers
+  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-CSRF-TOKEN');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
 
-  // pilih API set 1 atau 2
-  let masterKey, accessKey;
-  if (apiSet === "1") {
-    masterKey = process.env.JSONBIN_MASTER1;
-    accessKey = process.env.JSONBIN_ACCESS1;
-  } else {
-    masterKey = process.env.JSONBIN_MASTER2;
-    accessKey = process.env.JSONBIN_ACCESS2;
+  // Handle preflight request
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
   }
 
-  if (!binId || !apiSet) {
-    return res.status(400).json({ error: "binId dan apiSet diperlukan" });
+  // Verifikasi JWT
+  const token = req.cookies?.token;
+  if (!token) {
+    return res.status(401).json({ message: 'Tidak terautentikasi' });
   }
-
-  const url = `https://api.jsonbin.io/v3/b/${binId}`;
-  const headers = {
-    "Content-Type": "application/json",
-    "X-Master-Key": masterKey,
-    "X-Access-Key": accessKey
-  };
 
   try {
-    let response;
-    if (method === "POST") {
-      response = await fetch(url, {
-        method: "PUT",
-        headers,
-        body: JSON.stringify(data)
-      });
-    } else {
-      response = await fetch(url, { method: "GET", headers });
+    // Verifikasi token (gunakan library jwt di production)
+    const jwt = require('jsonwebtoken');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    const { binId } = decoded;
+    if (!binId) {
+      return res.status(401).json({ message: 'Token tidak valid' });
     }
 
-    const result = await response.json();
-    res.status(200).json(result);
+    // Route berdasarkan path dan method
+    const path = req.url.split('?')[0];
 
-  } catch (err) {
-    res.status(500).json({ error: "Server error", details: err.message });
+    if (req.method === 'GET' && path === '/api/jsonbin') {
+      // Ambil data dari JSONBin
+      const binResponse = await fetch(`https://api.jsonbin.io/v3/b/${binId}`, {
+        headers: {
+          'X-Master-Key': process.env.JSONBIN_MASTER_KEY
+        }
+      });
+
+      if (!binResponse.ok) {
+        return res.status(binResponse.status).json({ message: 'Gagal mengambil data' });
+      }
+
+      const binData = await binResponse.json();
+      res.status(200).json(binData.record);
+    } 
+    else if (req.method === 'PUT' && path === '/api/jsonbin') {
+      // Update data di JSONBin
+      const newData = req.body;
+
+      const binResponse = await fetch(`https://api.jsonbin.io/v3/b/${binId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Master-Key': process.env.JSONBIN_MASTER_KEY
+        },
+        body: JSON.stringify(newData)
+      });
+
+      if (!binResponse.ok) {
+        return res.status(binResponse.status).json({ message: 'Gagal menyimpan data' });
+      }
+
+      res.status(200).json({ message: 'Data berhasil disimpan' });
+    }
+    else {
+      res.status(404).json({ message: 'Endpoint not found' });
+    }
+  } catch (error) {
+    console.error('JSONBin API error:', error);
+    
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ message: 'Token tidak valid' });
+    }
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ message: 'Token kedaluwarsa' });
+    }
+    
+    res.status(500).json({ message: 'Terjadi kesalahan server' });
   }
-}
+};
